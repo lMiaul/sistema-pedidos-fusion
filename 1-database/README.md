@@ -112,11 +112,11 @@ en orden alfabetico (01 antes que 02).
 Para verificar que los datos se cargaron:
 
 ```bash
-docker exec -it logistock_mongo mongosh \
+docker exec -it menu_fusion_mongo mongosh \
   -u admin -p secret \
   --authenticationDatabase admin \
   restaurante_fusion \
-  --eval "db.ordenes.find().pretty()"
+  --eval "db.ordenes.countDocuments()"
 ```
 
 ---
