@@ -1,0 +1,9 @@
+FROM mongo:7.0
+
+ENV MONGO_INITDB_DATABASE=restaurante_fusion
+
+COPY init/ /docker-entrypoint-initdb.d/
+
+HEALTHCHECK --interval=10s --timeout=5s --start-period=20s --retries=3 \
+  CMD mongosh --quiet --eval "db.adminCommand('ping').ok" \
+  || exit 1

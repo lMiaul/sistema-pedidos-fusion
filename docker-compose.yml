@@ -1,7 +1,8 @@
 services:
 
   mongodb:
-    image: mongo:7.0
+    build:
+      context: ./1-database
     container_name: menu_fusion_mongo
     environment:
       MONGO_INITDB_ROOT_USERNAME: admin
@@ -11,7 +12,6 @@ services:
       - "27017:27017"
     volumes:
       - mongo_data:/data/db
-      - ./1-database/init:/docker-entrypoint-initdb.d
     restart: always
 
   # ─── PENDIENTE: agregar servicio backend-api aqui ───
