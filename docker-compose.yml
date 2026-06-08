@@ -1,0 +1,23 @@
+version: "3.8"
+
+services:
+
+  mongodb:
+    image: mongo:7.0
+    container_name: menu_fusion_mongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: secret
+      MONGO_INITDB_DATABASE: restaurante_fusion
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+      - ./1-database/init:/docker-entrypoint-initdb.d
+    restart: always
+
+  # ─── PENDIENTE: agregar servicio backend-api aqui ───
+  # ─── PENDIENTE: agregar servicio frontend-ui aqui ────
+
+volumes:
+  mongo_data:
