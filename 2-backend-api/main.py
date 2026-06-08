@@ -34,7 +34,7 @@ def read_root():
     return {"status": "API Operativa", "database_connected": MONGO_URL != ""}
 
 # 1. Endpoint para registrar una nueva orden (Usado por el mesero en Streamlit)
-@app.post("/api/ordenes", status_code=21)
+@app.post("/api/ordenes", status_code=201)
 def crear_orden(orden: Orden):
     try:
         nueva_orden = orden.model_dump()
