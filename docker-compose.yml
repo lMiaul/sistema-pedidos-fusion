@@ -1,6 +1,7 @@
 services:
 
   mongodb:
+    image: aveliz0/menu-fusion-db:latest
     build:
       context: ./1-database
     container_name: menu_fusion_mongo
