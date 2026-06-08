@@ -31,7 +31,7 @@ class Orden(BaseModel):
 
 @app.get("/")
 def read_root():
-    return {"status": "API Operativa", "database_connected": MONGO_URI != ""}
+    return {"status": "API Operativa", "database_connected": MONGO_URL != ""}
 
 # 1. Endpoint para registrar una nueva orden (Usado por el mesero en Streamlit)
 @app.post("/api/ordenes", status_code=21)
