@@ -106,6 +106,13 @@ Desde la raiz del proyecto:
 docker compose up mongodb
 ```
 
+Para construir la imagen y forzar re-inicializacion completa:
+
+```bash
+docker compose down -v
+docker compose up mongodb --build
+```
+
 Primera vez: MongoDB ejecuta automaticamente los scripts en init/
 en orden alfabetico (01 antes que 02).
 
@@ -135,6 +142,23 @@ docker exec -it menu_fusion_mongo mongosh \
 02_seed_data.js inserta:
 - 2 menus del dia (almuerzo y cena) con 5 platos cada uno
 - 3 ordenes en distintos estados para probar el dashboard
+
+---
+
+### Dockerfile
+
+Se usa un Dockerfile personalizado en lugar de la imagen oficial directa por dos razones concretas:
+
+1. Los scripts de init se copian dentro de la imagen con `COPY init/`. Esto garantiza que
+   los datos de prueba esten disponibles independientemente del estado del volumen, a 
+   diferencia del montaje por volumen donde el seed solo corre si el volumen esta vacio.
+
+2. Se agrega un `HEALTHCHECK` que verifica que MongoDB responde antes de que otros
+   servicios intenten conectarse. Mauricio puede usar `depends_on: condition: service_healthy`
+   en su servicio de API para evitar errores de conexion en el arranque.
+
+> Fuente: Docker, Inc. (2024). *Dockerfile reference — HEALTHCHECK*.
+> https://docs.docker.com/reference/dockerfile/#healthcheck
 
 ---
 
