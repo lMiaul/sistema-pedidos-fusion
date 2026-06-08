@@ -162,6 +162,13 @@ Se usa un Dockerfile personalizado en lugar de la imagen oficial directa por dos
 
 ---
 
+## Imagen publica en Docker Hub
+La imagen esta publicada en Docker Hub y puede descargarse sin clonar el repositorio:
+docker pull aveliz0/menu-fusion-db:latest
+URL: https://hub.docker.com/r/aveliz0/menu-fusion-db
+
+---
+
 ## Autor
 
 Ale Veliz
