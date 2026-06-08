@@ -50,7 +50,7 @@ db.createCollection("ordenes", {
                 minimum: 1
               },
               nota: {
-                bsonType: "string",
+                bsonType: ["string", "null"],
                 description: "Opcional"
               }
             }
