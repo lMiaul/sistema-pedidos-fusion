@@ -167,7 +167,6 @@ def render_header_columna(estado):
 
 
 # SIDEBAR Y NAVEGACIÓN
- 
 st.title("🍛 Restaurant Fusion Pro")
 st.caption("Sistema Inteligente de Cocina y Analítica en Tiempo Real")
 
@@ -184,7 +183,6 @@ menu_dia = obtener_menu()
 
 
 # PÁGINA: COCINA INTERACTIVA
- 
 if pagina == "👨‍🍳 Cocina Interactiva":
 
     st.subheader("👨‍🍳 Cocina en Tiempo Real")
@@ -247,7 +245,6 @@ if pagina == "👨‍🍳 Cocina Interactiva":
 
 
 # PÁGINA: MENÚ DEL DÍA
- 
 elif pagina == "📋 Menú del Día":
 
     st.subheader("📋 Gestión del Menú")
@@ -273,7 +270,6 @@ elif pagina == "📋 Menú del Día":
 
 
 # PÁGINA: ANALÍTICA
- 
 elif pagina == "📊 Analítica":
 
     st.subheader("📊 Dashboard Analítico")
