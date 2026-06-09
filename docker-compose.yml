@@ -15,7 +15,18 @@ services:
       - mongo_data:/data/db
     restart: always
 
-  # ─── PENDIENTE: agregar servicio backend-api aqui ───
+  backend-api:
+    image: llmiaull/api-menu-fusion:latest
+    build:
+      context: ./2-backend-api
+    ports:
+      - "8000:8000"
+    environment:
+      # Este es el "enlace" con los datos del servicio de arriba
+      - MONGO_URL=mongodb://admin:secret@mongodb:27017/
+    depends_on:
+      # Esto asegura que arranque después de la BD
+      - mongodb
   # ─── PENDIENTE: agregar servicio frontend-ui aqui ────
 
 volumes:
