@@ -247,26 +247,180 @@ if pagina == "👨‍🍳 Cocina Interactiva":
 # PÁGINA: MENÚ DEL DÍA
 elif pagina == "📋 Menú del Día":
 
-    st.subheader("📋 Gestión del Menú")
+    st.subheader("📋 Nuevo Pedido")
 
     if not menu_dia:
+
         st.warning("No hay menú registrado.")
+
     else:
-        for menu in menu_dia:
-            st.markdown(f"## 🍽️ {menu['fecha']} — {menu['turno'].capitalize()}")
-            columnas = st.columns(3)
 
-            for idx, plato in enumerate(menu["platos"]):
-                precio = plato.get("precio_especial", plato["precio_base"])
-                disponible_txt = "🟢 Disponible" if plato["disponible"] else "🔴 No disponible"
+        menu_actual = menu_dia[0]
 
-                with columnas[idx % 3]:
-                    with st.container(border=True):
-                        st.markdown(f"### {plato['nombre']}")
-                        st.caption(plato["categoria"].capitalize())
-                        st.write(f"💵 S/ {precio}")
-                        st.write(f"⏱️ {plato['tiempo_prep_min']} min")
-                        st.write(disponible_txt)
+        st.markdown(
+            f"### 🍽️ {menu_actual['fecha']} — {menu_actual['turno'].capitalize()}"
+        )
+
+        platos_disponibles = [
+            p for p in menu_actual["platos"]
+            if p["disponible"]
+        ]
+
+        with st.form("nuevo_pedido"):
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+
+                mesa = st.number_input(
+                    "🍽️ Mesa",
+                    min_value=1,
+                    step=1
+                )
+
+                mesero = st.text_input(
+                    "👨 Nombre del mesero"
+                )
+
+            with col2:
+
+                turno = st.selectbox(
+                    "🌙 Turno",
+                    ["almuerzo", "cena"]
+                )
+
+                estado = "En cola"
+
+            st.divider()
+
+            st.markdown("### 🍛 Seleccionar Platos")
+
+            platos_pedido = []
+
+            for plato in platos_disponibles:
+
+                with st.container(border=True):
+
+                    c1, c2 = st.columns([3,1])
+
+                    with c1:
+
+                        agregar = st.checkbox(
+                            f"{plato['nombre']} • S/ {plato.get('precio_especial', plato['precio_base'])}",
+                            key=f"check_{plato['nombre']}"
+                        )
+
+                    with c2:
+
+                        cantidad = st.number_input(
+                            "Cantidad",
+                            min_value=1,
+                            max_value=20,
+                            value=1,
+                            key=f"cant_{plato['nombre']}"
+                        )
+
+                    nota = st.text_input(
+                        "Nota",
+                        placeholder="Ej: sin cebolla",
+                        key=f"nota_{plato['nombre']}"
+                    )
+
+                    if agregar:
+
+                        platos_pedido.append({
+
+                            "nombre": plato["nombre"],
+
+                            "categoria": plato["categoria"],
+
+                            "precio": plato.get(
+                                "precio_especial",
+                                plato["precio_base"]
+                            ),
+
+                            "cantidad": cantidad,
+
+                            "nota": nota if nota else None
+                        })
+
+            enviado = st.form_submit_button(
+                "🚀 Enviar Pedido a Cocina",
+                use_container_width=True
+            )
+
+            if enviado:
+
+                if not mesero.strip():
+
+                    st.error("Ingresa el nombre del mesero.")
+
+                elif not platos_pedido:
+
+                    st.error("Debes seleccionar al menos un plato.")
+
+                else:
+
+                    nueva_orden = {
+
+                        "mesa": int(mesa),
+
+                        "turno": turno,
+
+                        "mesero": mesero,
+
+                        "estado": estado,
+
+                        "timestamp": datetime.utcnow().isoformat(),
+
+                        "platos": platos_pedido
+                    }
+
+                    ordenes_collection.insert_one(
+                        nueva_orden
+                    )
+
+                    st.cache_data.clear()
+
+                    st.success(
+                        "✅ Pedido enviado correctamente a cocina."
+                    )
+
+                    st.rerun()
+
+        st.divider()
+
+        st.markdown("### 🍽️ Menú Disponible")
+
+        columnas = st.columns(3)
+
+        for idx, plato in enumerate(platos_disponibles):
+
+            with columnas[idx % 3]:
+
+                precio = plato.get(
+                    "precio_especial",
+                    plato["precio_base"]
+                )
+
+                with st.container(border=True):
+
+                    st.markdown(
+                        f"### {plato['nombre']}"
+                    )
+
+                    st.caption(
+                        plato["categoria"].capitalize()
+                    )
+
+                    st.write(f"💵 S/ {precio}")
+
+                    st.write(
+                        f"⏱️ {plato['tiempo_prep_min']} min"
+                    )
+
+                    st.success("🟢 Disponible")
+
 
 
 # PÁGINA: ANALÍTICA
