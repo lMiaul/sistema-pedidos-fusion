@@ -344,11 +344,14 @@ elif pagina == "📋 Menú del Día":
 
         for idx, plato in enumerate(platos_disponibles):
             with columnas[idx % 3]:
-                precio = plato.get("precio_especial", plato["precio_base"])
+                precio_especial = plato.get("precio_especial")
+                precio_base = plato.get("precio_base", 0)
+                precio_final = precio_especial if (precio_especial is not None and precio_especial > 0) else precio_base
+
                 with st.container(border=True):
                     st.markdown(f"### {plato['nombre']}")
                     st.caption(plato["categoria"].capitalize())
-                    st.write(f"💵 S/ {precio}")
+                    st.write(f"💵 S/ {precio_final}")
                     st.write(f"⏱️ {plato['tiempo_prep_min']} min")
                     st.success("🟢 Disponible")
 
