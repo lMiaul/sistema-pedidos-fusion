@@ -27,7 +27,18 @@ services:
     depends_on:
       # Esto asegura que arranque después de la BD
       - mongodb
-  # ─── PENDIENTE: agregar servicio frontend-ui aqui ────
+  
+  frontend-ui:
+    image: marisoool/frontend-menu-fusion:latest
+    build:
+      context: ./3-frontend-ui
+    ports:
+      - "8501:8501"
+    environment:
+      - MONGO_URL=mongodb://admin:secret@mongodb:27017/
+    depends_on:
+      - mongodb
+      - backend-api
 
 volumes:
   mongo_data:
