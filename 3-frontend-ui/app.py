@@ -247,6 +247,8 @@ if pagina == "👨‍🍳 Cocina Interactiva":
 # PÁGINA: MENÚ DEL DÍA
 elif pagina == "📋 Menú del Día":
 
+    import time
+
     st.subheader("📋 Nuevo Pedido")
 
     if not menu_dia:
@@ -264,97 +266,201 @@ elif pagina == "📋 Menú del Día":
             if p["disponible"]
         ]
 
-        with st.form("nuevo_pedido"):
-            col1, col2 = st.columns(2)
+        with st.form("nuevo_pedido", clear_on_submit=True):
+
+            st.markdown("## 🧾 Información del Pedido")
+
+            col1, col2, col3 = st.columns(3)
 
             with col1:
                 mesa = st.selectbox(
                     "🍽️ Mesa",
-                    options=range(1, 11),
-                    format_func=lambda x: f"Mesa {x}"
+                    options=["Seleccionar"] + list(range(1, 11)),
+                    key="mesa_select"
                 )
-                # CAMBIO: Selectbox para meseros
-                meseros_disponibles = ["Ana Torres", "Carlos Diaz", "Juan Perez", "Maria Lopez"]
-                mesero = st.selectbox("👨 Nombre del mesero", meseros_disponibles)
 
             with col2:
-                turno = st.selectbox("🌙 Turno", ["almuerzo", "cena"])
-                estado = "En cola"
+                turno = st.selectbox(
+                    "🌙 Turno",
+                    options=["Seleccionar", "almuerzo", "cena"],
+                    key="turno_select"
+                )
+
+            with col3:
+                meseros_disponibles = [
+                    "Seleccionar",
+                    "Ana Torres",
+                    "Carlos Diaz",
+                    "Juan Perez",
+                    "Maria Lopez"
+                ]
+
+                mesero = st.selectbox(
+                    "👨 Nombre del mesero",
+                    meseros_disponibles,
+                    key="mesero_select"
+                )
+
+            estado = "En cola"
 
             st.divider()
-            st.markdown("### 🍛 Seleccionar Platos")
+
+            st.markdown("## 🍛 Seleccionar Platos")
 
             platos_pedido = []
 
             for plato in platos_disponibles:
-                id_plato = plato.get("_id", plato["nombre"])
-                precio_mostrar = plato.get("precio_especial") or plato.get("precio_base", 0)
-                
+
+                id_plato = str(plato.get("_id", plato["nombre"]))
+
+                precio_mostrar = (
+                    plato.get("precio_especial")
+                    if plato.get("precio_especial") is not None
+                    else plato.get("precio_base", 0)
+                )
+
                 with st.container(border=True):
-                    c1, c2 = st.columns([3, 1])
+
+                    c1, c2 = st.columns([4, 1])
+
                     with c1:
                         agregar = st.checkbox(
                             f"{plato['nombre']} • S/ {precio_mostrar}",
                             key=f"check_{id_plato}"
                         )
+
                     with c2:
                         cantidad = st.number_input(
-                            "Cant", min_value=1, max_value=20, value=1,
+                            "Cant",
+                            min_value=1,
+                            max_value=20,
+                            value=1,
+                            step=1,
                             key=f"cant_{id_plato}"
                         )
-                    
-                    nota = st.text_input("Nota", key=f"nota_{id_plato}")
+
+                    nota = st.text_input(
+                        "📝 Nota",
+                        key=f"nota_{id_plato}"
+                    )
 
                     if agregar:
+
                         platos_pedido.append({
                             "nombre": plato["nombre"],
                             "categoria": plato["categoria"],
-                            "precio": precio_mostrar,
-                            "cantidad": cantidad,
-                            "nota": nota if nota else None
+                            "precio": float(precio_mostrar),
+                            "cantidad": int(cantidad),
+                            "nota": nota.strip() if nota.strip() else None
                         })
+
+            st.divider()
 
             enviado = st.form_submit_button(
                 "🚀 Enviar Pedido a Cocina",
                 use_container_width=True
             )
 
+        # ========= ENVÍO =========
+
         if enviado:
-            if not mesero:
+
+            # VALIDACIONES
+
+            if mesa == "Seleccionar":
+                st.error("Selecciona una mesa.")
+
+            elif turno == "Seleccionar":
+                st.error("Selecciona un turno.")
+
+            elif mesero == "Seleccionar":
                 st.error("Selecciona un mesero.")
-            elif not platos_pedido:
+
+            elif len(platos_pedido) == 0:
                 st.error("Debes seleccionar al menos un plato.")
+
             else:
-                nueva_orden = {
-                    "mesa": int(mesa),
-                    "turno": turno,
-                    "mesero": mesero,
-                    "estado": estado,
-                    "timestamp": datetime.utcnow().isoformat(),
-                    "platos": platos_pedido
-                }
-                ordenes_collection.insert_one(nueva_orden)
-                st.cache_data.clear()
-                st.success("✅ Pedido enviado correctamente.")
-                st.rerun()
+
+                try:
+
+                    # ========= GUARDAR EN MONGO =========
+
+                    nueva_orden = {
+                        "mesa": int(mesa),
+                        "turno": turno,
+                        "mesero": mesero,
+                        "estado": estado,
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "platos": platos_pedido
+                    }
+
+                    resultado = ordenes_collection.insert_one(nueva_orden)
+
+                    # Verificación real
+                    if resultado.inserted_id:
+
+                        # Limpiar caché
+                        st.cache_data.clear()
+
+                        # LIMPIAR FORMULARIO
+
+                        mensaje = st.success(
+                            "✅ Pedido enviado correctamente a cocina."
+                        )
+
+                        # Esperar 5 segundos
+                        time.sleep(5)
+
+                        mensaje.empty()
+
+                        # Recargar app
+                        st.rerun()
+
+                    else:
+                        st.error("No se pudo guardar el pedido.")
+
+                except Exception as e:
+                    st.error(f"Error al guardar pedido: {e}")
+
+        # ========= MENÚ DISPONIBLE =========
 
         st.divider()
+
         st.markdown("### 🍽️ Menú Disponible")
+
         columnas = st.columns(3)
 
         for idx, plato in enumerate(platos_disponibles):
+
             with columnas[idx % 3]:
+
                 precio_especial = plato.get("precio_especial")
                 precio_base = plato.get("precio_base", 0)
-                precio_final = precio_especial if (precio_especial is not None and precio_especial > 0) else precio_base
+
+                precio_final = (
+                    precio_especial
+                    if (
+                        precio_especial is not None
+                        and precio_especial > 0
+                    )
+                    else precio_base
+                )
 
                 with st.container(border=True):
-                    st.markdown(f"### {plato['nombre']}")
-                    st.caption(plato["categoria"].capitalize())
-                    st.write(f"💵 S/ {precio_final}")
-                    st.write(f"⏱️ {plato['tiempo_prep_min']} min")
-                    st.success("🟢 Disponible")
 
+                    st.markdown(f"### {plato['nombre']}")
+
+                    st.caption(
+                        plato["categoria"].capitalize()
+                    )
+
+                    st.write(f"💵 S/ {precio_final}")
+
+                    st.write(
+                        f"⏱️ {plato['tiempo_prep_min']} min"
+                    )
+
+                    st.success("🟢 Disponible")
 
 # PÁGINA: ANALÍTICA
 elif pagina == "📊 Analítica":
