@@ -250,11 +250,9 @@ elif pagina == "📋 Menú del Día":
     st.subheader("📋 Nuevo Pedido")
 
     if not menu_dia:
-
         st.warning("No hay menú registrado.")
 
     else:
-
         menu_actual = menu_dia[0]
 
         st.markdown(
@@ -267,80 +265,52 @@ elif pagina == "📋 Menú del Día":
         ]
 
         with st.form("nuevo_pedido"):
-
             col1, col2 = st.columns(2)
 
             with col1:
-
-                mesa = st.number_input(
+                mesa = st.selectbox(
                     "🍽️ Mesa",
-                    min_value=1,
-                    step=1
+                    options=range(1, 11),
+                    format_func=lambda x: f"Mesa {x}"
                 )
-
-                mesero = st.text_input(
-                    "👨 Nombre del mesero"
-                )
+                # CAMBIO: Selectbox para meseros
+                meseros_disponibles = ["Ana Torres", "Carlos Diaz", "Juan Perez", "Maria Lopez"]
+                mesero = st.selectbox("👨 Nombre del mesero", meseros_disponibles)
 
             with col2:
-
-                turno = st.selectbox(
-                    "🌙 Turno",
-                    ["almuerzo", "cena"]
-                )
-
+                turno = st.selectbox("🌙 Turno", ["almuerzo", "cena"])
                 estado = "En cola"
 
             st.divider()
-
             st.markdown("### 🍛 Seleccionar Platos")
 
             platos_pedido = []
 
             for plato in platos_disponibles:
-
+                id_plato = plato.get("_id", plato["nombre"])
+                precio_mostrar = plato.get("precio_especial") or plato.get("precio_base", 0)
+                
                 with st.container(border=True):
-
-                    c1, c2 = st.columns([3,1])
-
+                    c1, c2 = st.columns([3, 1])
                     with c1:
-
                         agregar = st.checkbox(
-                            f"{plato['nombre']} • S/ {plato.get('precio_especial', plato['precio_base'])}",
-                            key=f"check_{plato['nombre']}"
+                            f"{plato['nombre']} • S/ {precio_mostrar}",
+                            key=f"check_{id_plato}"
                         )
-
                     with c2:
-
                         cantidad = st.number_input(
-                            "Cantidad",
-                            min_value=1,
-                            max_value=20,
-                            value=1,
-                            key=f"cant_{plato['nombre']}"
+                            "Cant", min_value=1, max_value=20, value=1,
+                            key=f"cant_{id_plato}"
                         )
-
-                    nota = st.text_input(
-                        "Nota",
-                        placeholder="Ej: sin cebolla",
-                        key=f"nota_{plato['nombre']}"
-                    )
+                    
+                    nota = st.text_input("Nota", key=f"nota_{id_plato}")
 
                     if agregar:
-
                         platos_pedido.append({
-
                             "nombre": plato["nombre"],
-
                             "categoria": plato["categoria"],
-
-                            "precio": plato.get(
-                                "precio_especial",
-                                plato["precio_base"]
-                            ),
-
+                            "precio": precio_mostrar,
                             "cantidad": cantidad,
-
                             "nota": nota if nota else None
                         })
 
@@ -349,78 +319,38 @@ elif pagina == "📋 Menú del Día":
                 use_container_width=True
             )
 
-            if enviado:
-
-                if not mesero.strip():
-
-                    st.error("Ingresa el nombre del mesero.")
-
-                elif not platos_pedido:
-
-                    st.error("Debes seleccionar al menos un plato.")
-
-                else:
-
-                    nueva_orden = {
-
-                        "mesa": int(mesa),
-
-                        "turno": turno,
-
-                        "mesero": mesero,
-
-                        "estado": estado,
-
-                        "timestamp": datetime.utcnow().isoformat(),
-
-                        "platos": platos_pedido
-                    }
-
-                    ordenes_collection.insert_one(
-                        nueva_orden
-                    )
-
-                    st.cache_data.clear()
-
-                    st.success(
-                        "✅ Pedido enviado correctamente a cocina."
-                    )
-
-                    st.rerun()
+        if enviado:
+            if not mesero:
+                st.error("Selecciona un mesero.")
+            elif not platos_pedido:
+                st.error("Debes seleccionar al menos un plato.")
+            else:
+                nueva_orden = {
+                    "mesa": int(mesa),
+                    "turno": turno,
+                    "mesero": mesero,
+                    "estado": estado,
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "platos": platos_pedido
+                }
+                ordenes_collection.insert_one(nueva_orden)
+                st.cache_data.clear()
+                st.success("✅ Pedido enviado correctamente.")
+                st.rerun()
 
         st.divider()
-
         st.markdown("### 🍽️ Menú Disponible")
-
         columnas = st.columns(3)
 
         for idx, plato in enumerate(platos_disponibles):
-
             with columnas[idx % 3]:
-
-                precio = plato.get(
-                    "precio_especial",
-                    plato["precio_base"]
-                )
-
+                precio = plato.get("precio_especial", plato["precio_base"])
                 with st.container(border=True):
-
-                    st.markdown(
-                        f"### {plato['nombre']}"
-                    )
-
-                    st.caption(
-                        plato["categoria"].capitalize()
-                    )
-
+                    st.markdown(f"### {plato['nombre']}")
+                    st.caption(plato["categoria"].capitalize())
                     st.write(f"💵 S/ {precio}")
-
-                    st.write(
-                        f"⏱️ {plato['tiempo_prep_min']} min"
-                    )
-
+                    st.write(f"⏱️ {plato['tiempo_prep_min']} min")
                     st.success("🟢 Disponible")
-
 
 
 # PÁGINA: ANALÍTICA
