@@ -7,9 +7,7 @@ import plotly.express as px
 import os
 import time
 
-# =========================================================
 # CONFIGURACIÓN
-# =========================================================
 
 st.set_page_config(
     page_title="Restaurant Fusion Pro 🍛",
@@ -18,9 +16,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# =========================================================
 # ESTILOS
-# =========================================================
 
 st.markdown("""
 <style>
@@ -64,7 +60,6 @@ menu_collection = db["menu_del_dia"]
 
 # =========================================================
 # HELPERS
-# =========================================================
 
 @st.cache_data(ttl=5)
 def obtener_ordenes():
