@@ -1,12 +1,11 @@
 import streamlit as st
-import requests
 from pymongo import MongoClient
 from bson import ObjectId
 from datetime import datetime
 import pandas as pd
 import plotly.express as px
 import os
-import timegit
+import time
 
 # =========================================================
 # CONFIGURACIÓN
@@ -47,22 +46,13 @@ h1, h2, h3 {
 """, unsafe_allow_html=True)
 
 # =========================================================
-# CONFIG
+# MONGODB
 # =========================================================
-
-API_URL = os.getenv(
-    "API_URL",
-    "http://localhost:8000"
-)
 
 MONGO_URL = os.getenv(
     "MONGO_URL",
     "mongodb://localhost:27017/"
 )
-
-# =========================================================
-# MONGODB
-# =========================================================
 
 client = MongoClient(MONGO_URL)
 
@@ -73,94 +63,49 @@ ordenes_collection = db["ordenes"]
 menu_collection = db["menu_del_dia"]
 
 # =========================================================
-# HELPERS API
+# HELPERS
 # =========================================================
 
 @st.cache_data(ttl=5)
 def obtener_ordenes():
 
-    try:
-
-        response = requests.get(
-            f"{API_URL}/api/ordenes/activas"
+    ordenes = list(
+        ordenes_collection.find().sort(
+            "timestamp",
+            1
         )
+    )
 
-        if response.status_code == 200:
+    for o in ordenes:
+        o["_id"] = str(o["_id"])
 
-            return response.json()
+    return ordenes
 
-        return []
-
-    except Exception as e:
-
-        st.error(
-            f"Error conectando API: {e}"
-        )
-
-        return []
-
-
-def actualizar_estado(
-    orden_id,
-    nuevo_estado
-):
-
-    try:
-
-        response = requests.put(
-            f"{API_URL}/api/ordenes/{orden_id}/estado",
-            json={
-                "nuevo_estado": nuevo_estado
-            }
-        )
-
-        return response.status_code == 200
-
-    except Exception as e:
-
-        st.error(
-            f"Error actualizando estado: {e}"
-        )
-
-        return False
-
-# =========================================================
-# HELPERS MONGO
-# =========================================================
 
 @st.cache_data(ttl=30)
 def obtener_menu():
 
-    menu = list(
-        menu_collection.find()
-    )
+    menu = list(menu_collection.find())
 
     for m in menu:
-
         m["_id"] = str(m["_id"])
 
     return menu
 
 
-def guardar_pedido_mongo(
-    nueva_orden
-):
+def actualizar_estado(orden_id, nuevo_estado):
 
-    resultado = (
-        ordenes_collection.insert_one(
-            nueva_orden
-        )
+    ordenes_collection.update_one(
+        {"_id": ObjectId(orden_id)},
+        {
+            "$set": {
+                "estado": nuevo_estado
+            }
+        }
     )
 
-    return resultado.inserted_id
 
-# =========================================================
-# HELPERS GENERALES
-# =========================================================
-
-def calcular_total_orden(
-    platos
-):
+def calcular_total_orden(platos):
 
     return sum(
         p["precio"] * p["cantidad"]
@@ -168,9 +113,7 @@ def calcular_total_orden(
     )
 
 
-def formatear_fecha(
-    fecha_iso
-):
+def formatear_fecha(fecha_iso):
 
     try:
 
@@ -178,16 +121,14 @@ def formatear_fecha(
             fecha_iso.replace("Z", "")
         )
 
-        return fecha.strftime(
-            "%H:%M"
-        )
+        return fecha.strftime("%H:%M")
 
     except Exception:
 
         return str(fecha_iso)
 
 # =========================================================
-# CONFIG KANBAN
+# KANBAN
 # =========================================================
 
 ESTADOS_CONFIG = {
@@ -221,9 +162,7 @@ ESTADOS_KANBAN = [
 # UI COMPONENTS
 # =========================================================
 
-def render_header_columna(
-    estado
-):
+def render_header_columna(estado):
 
     config = ESTADOS_CONFIG[estado]
 
@@ -249,130 +188,80 @@ def render_header_columna(
     )
 
 
-def render_kanban_card(
-    orden,
-    estado_actual
-):
+def render_kanban_card(orden, estado_actual, col):
+    config = ESTADOS_CONFIG[estado_actual]
+    total = calcular_total_orden(orden["platos"])
 
-    config = ESTADOS_CONFIG[
-        estado_actual
-    ]
-
-    total = calcular_total_orden(
-        orden["platos"]
-    )
-
-    with st.container(border=True):
-
-        st.markdown(
-            f"""
-            <div style="
-                border-left: 6px solid {config['color']};
-                background: #111827;
-                padding: 12px;
-                border-radius: 12px;
-                margin-bottom: 10px;
-            ">
-
-                <div style="
-                    font-size: 20px;
-                    font-weight: bold;
-                    color: white;
-                ">
-                    🍽️ Mesa {orden['mesa']}
-                </div>
-
-                <div style="
-                    color: #9ca3af;
-                    font-size: 13px;
-                    margin-top: 4px;
-                ">
-                    👨 {orden['mesero']}
-                    &nbsp;•&nbsp;
-                    🕒 {formatear_fecha(orden['timestamp'])}
-                    &nbsp;•&nbsp;
-                    🌙 {orden['turno'].capitalize()}
-                </div>
-
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-        for plato in orden["platos"]:
-
+    with col:
+        with st.container(border=True):
             st.markdown(
                 f"""
                 <div style="
-                    background: #1f2937;
-                    padding: 10px 12px;
-                    border-radius: 10px;
-                    margin-bottom: 8px;
-                    color: white;
+                    border-left: 6px solid {config['color']};
+                    background: #111827;
+                    padding: 12px;
+                    border-radius: 12px;
+                    margin-bottom: 10px;
                 ">
-                    <b>
-                        {plato['cantidad']}x
-                        {plato['nombre']}
-                    </b>
-
-                    <br>
-
-                    <small style="
-                        color:#9ca3af;
-                    ">
-                        {plato['categoria'].capitalize()}
+                    <div style="font-size: 20px; font-weight: bold; color: white;">
+                        🍽️ Mesa {orden['mesa']}
+                    </div>
+                    <div style="color: #9ca3af; font-size: 13px; margin-top: 4px;">
+                        👨 {orden['mesero']}
                         &nbsp;•&nbsp;
-                        S/ {plato['precio']}
-                    </small>
+                        🕒 {formatear_fecha(orden['timestamp'])}
+                        &nbsp;•&nbsp;
+                        🌙 {orden['turno'].capitalize()}
+                    </div>
                 </div>
                 """,
-                unsafe_allow_html=True
+                unsafe_allow_html=True # <--- AQUÍ ESTÁ EL CAMBIO
             )
 
-            if plato.get("nota"):
-
-                st.caption(
-                    f"📝 {plato['nota']}"
+            for plato in orden["platos"]:
+                st.markdown(
+                    f"""
+                    <div style="
+                        background: #1f2937;
+                        padding: 10px 12px;
+                        border-radius: 10px;
+                        margin-bottom: 8px;
+                        color: white;
+                    ">
+                        <b>{plato['cantidad']}x {plato['nombre']}</b><br>
+                        <small style="color:#9ca3af;">
+                            {plato['categoria'].capitalize()} &nbsp;•&nbsp; S/ {plato['precio']}
+                        </small>
+                    </div>
+                    """,
+                    unsafe_allow_html=True # <--- AQUÍ ESTÁ EL CAMBIO
                 )
+                if plato.get("nota"):
+                    st.caption(f"📝 {plato['nota']}")
 
-        st.success(
-            f"💰 Total: S/ {total:.2f}"
-        )
+            st.success(f"💰 Total: S/ {total:.2f}")
 
-        if config["next"]:
-
-            if st.button(
-                f"➡️ {config['next']}",
-                key=f"{orden['_id']}_{config['next']}",
-                use_container_width=True
-            ):
-
-                ok = actualizar_estado(
-                    orden["_id"],
-                    config["next"]
-                )
-
-                if ok:
-
+            if config["next"]:
+                if st.button(
+                    f"➡️ {config['next']}",
+                    key=f"btn_{orden['_id']}_{config['next']}",
+                    use_container_width=True
+                ):
+                    actualizar_estado(orden["_id"], config["next"])
                     st.cache_data.clear()
-
                     st.rerun()
 
 # =========================================================
 # HEADER
 # =========================================================
 
-st.title(
-    "🍛 Restaurant Fusion Pro"
-)
+st.title("🍛 Restaurant Fusion Pro")
 
 st.caption(
     "Sistema Inteligente de Cocina y Analítica en Tiempo Real"
 )
 
-st.sidebar.title(
-    "⚙️ Panel de Control"
-)
+st.sidebar.title("⚙️ Panel de Control")
 
 pagina = st.sidebar.radio(
     "📂 Navegación",
@@ -402,9 +291,7 @@ if pagina == "👨‍🍳 Cocina Interactiva":
         placeholder="Mesa, mesero o plato..."
     )
 
-    def coincide_busqueda(
-        orden
-    ):
+    def coincide_busqueda(orden):
 
         texto = busqueda.lower()
 
@@ -414,12 +301,8 @@ if pagina == "👨‍🍳 Cocina Interactiva":
         )
 
         return (
-            texto in str(
-                orden["mesa"]
-            ).lower()
-            or texto in orden[
-                "mesero"
-            ].lower()
+            texto in str(orden["mesa"]).lower()
+            or texto in orden["mesero"].lower()
             or texto in platos_texto
         )
 
@@ -427,8 +310,7 @@ if pagina == "👨‍🍳 Cocina Interactiva":
 
         o for o in ordenes
 
-        if o["estado"]
-        in ESTADOS_KANBAN
+        if o["estado"] in ESTADOS_KANBAN
 
         and (
             coincide_busqueda(o)
@@ -469,35 +351,20 @@ if pagina == "👨‍🍳 Cocina Interactiva":
     col1, col2, col3 = st.columns(3)
 
     columnas_map = {
-
         "En cola": col1,
-
         "Preparando": col2,
-
         "Listo": col3
     }
 
     for estado, col in columnas_map.items():
-
         with col:
-
-            render_header_columna(
-                estado
-            )
-
-            ordenes_estado = [
-
-                o for o in ordenes_activas
-
-                if o["estado"] == estado
-            ]
-
+            render_header_columna(estado)
+            
+            ordenes_estado = [o for o in ordenes_activas if o["estado"] == estado]
+            
             for orden in ordenes_estado:
-
-                render_kanban_card(
-                    orden,
-                    estado
-                )
+                # Aquí pasas el objeto 'col' que viene del diccionario
+                render_kanban_card(orden, estado, col)
 
     if not ordenes_activas:
 
@@ -511,9 +378,7 @@ if pagina == "👨‍🍳 Cocina Interactiva":
 
 elif pagina == "📋 Menú del Día":
 
-    st.subheader(
-        "📋 Nuevo Pedido"
-    )
+    st.subheader("📋 Nuevo Pedido")
 
     if not menu_dia:
 
@@ -545,10 +410,6 @@ elif pagina == "📋 Menú del Día":
             "nuevo_pedido",
             clear_on_submit=True
         ):
-
-            st.markdown(
-                "## 🧾 Información"
-            )
 
             col1, col2, col3 = st.columns(3)
 
@@ -585,35 +446,19 @@ elif pagina == "📋 Menú del Día":
 
             st.divider()
 
-            st.markdown(
-                "## 🍛 Seleccionar Platos"
-            )
-
             platos_pedido = []
 
             for plato in platos_disponibles:
 
-                id_plato = plato[
-                    "nombre"
-                ]
+                with st.container(border=True):
 
-                precio_mostrar = plato[
-                    "precio_base"
-                ]
-
-                with st.container(
-                    border=True
-                ):
-
-                    c1, c2 = st.columns(
-                        [4, 1]
-                    )
+                    c1, c2 = st.columns([4, 1])
 
                     with c1:
 
                         agregar = st.checkbox(
-                            f"{plato['nombre']} • S/ {precio_mostrar}",
-                            key=f"check_{id_plato}"
+                            f"{plato['nombre']} • S/ {plato['precio_base']}",
+                            key=f"check_{plato['nombre']}"
                         )
 
                     with c2:
@@ -623,34 +468,31 @@ elif pagina == "📋 Menú del Día":
                             min_value=1,
                             max_value=20,
                             value=1,
-                            key=f"cant_{id_plato}"
+                            key=f"cant_{plato['nombre']}"
                         )
 
                     nota = st.text_input(
                         "📝 Nota",
-                        key=f"nota_{id_plato}"
+                        key=f"nota_{plato['nombre']}"
                     )
 
                     if agregar:
 
                         platos_pedido.append({
 
-                            "nombre":
-                            plato["nombre"],
+                            "nombre": plato["nombre"],
 
-                            "categoria":
-                            plato["categoria"],
+                            "categoria": plato["categoria"],
 
-                            "precio":
-                            float(
-                                precio_mostrar
+                            "precio": float(
+                                plato["precio_base"]
                             ),
 
-                            "cantidad":
-                            int(cantidad),
+                            "cantidad": int(
+                                cantidad
+                            ),
 
-                            "nota":
-                            (
+                            "nota": (
                                 nota.strip()
                                 if nota.strip()
                                 else None
@@ -705,22 +547,21 @@ elif pagina == "📋 Menú del Día":
                         "timestamp":
                         datetime.utcnow().isoformat(),
 
-                        "platos":
-                        platos_pedido
+                        "platos": platos_pedido
                     }
 
-                    inserted_id = (
-                        guardar_pedido_mongo(
+                    resultado = (
+                        ordenes_collection.insert_one(
                             nueva_orden
                         )
                     )
 
-                    if inserted_id:
+                    if resultado.inserted_id:
 
                         st.cache_data.clear()
 
                         mensaje = st.success(
-                            "✅ Pedido enviado correctamente."
+                            "✅ Pedido enviado."
                         )
 
                         time.sleep(2)
@@ -732,7 +573,7 @@ elif pagina == "📋 Menú del Día":
                 except Exception as e:
 
                     st.error(
-                        f"Error guardando pedido: {e}"
+                        f"Error: {e}"
                     )
 
 # =========================================================
@@ -753,9 +594,7 @@ elif pagina == "📊 Analítica":
 
     else:
 
-        total_ordenes = len(
-            ordenes
-        )
+        total_ordenes = len(ordenes)
 
         total_ventas = sum(
             calcular_total_orden(
@@ -774,8 +613,6 @@ elif pagina == "📊 Analítica":
 
         ticket_promedio = (
             total_ventas / total_ordenes
-            if total_ordenes
-            else 0
         )
 
         k1, k2, k3, k4 = st.columns(4)
@@ -805,29 +642,14 @@ elif pagina == "📊 Analítica":
         data_platos = [
 
             {
-                "Plato":
-                plato["nombre"],
-
-                "Categoría":
-                plato["categoria"],
-
-                "Cantidad":
-                plato["cantidad"],
-
-                "Precio":
-                plato["precio"],
-
-                "Mesero":
-                orden["mesero"],
-
-                "Mesa":
-                orden["mesa"],
-
-                "Estado":
-                orden["estado"],
-
-                "Turno":
-                orden["turno"]
+                "Plato": plato["nombre"],
+                "Categoría": plato["categoria"],
+                "Cantidad": plato["cantidad"],
+                "Precio": plato["precio"],
+                "Mesero": orden["mesero"],
+                "Mesa": orden["mesa"],
+                "Estado": orden["estado"],
+                "Turno": orden["turno"]
             }
 
             for orden in ordenes
@@ -835,9 +657,7 @@ elif pagina == "📊 Analítica":
             for plato in orden["platos"]
         ]
 
-        df = pd.DataFrame(
-            data_platos
-        )
+        df = pd.DataFrame(data_platos)
 
         st.markdown(
             "### 🔥 Top Platos"
@@ -845,9 +665,7 @@ elif pagina == "📊 Analítica":
 
         top_platos = (
 
-            df.groupby("Plato")[
-                "Cantidad"
-            ]
+            df.groupby("Plato")["Cantidad"]
 
             .sum()
 
@@ -878,9 +696,7 @@ elif pagina == "📊 Analítica":
 
         categorias = (
 
-            df.groupby(
-                "Categoría"
-            )["Cantidad"]
+            df.groupby("Categoría")["Cantidad"]
 
             .sum()
 
@@ -905,9 +721,7 @@ elif pagina == "📊 Analítica":
 
         meseros = (
 
-            df.groupby("Mesero")[
-                "Cantidad"
-            ]
+            df.groupby("Mesero")["Cantidad"]
 
             .sum()
 
@@ -938,15 +752,11 @@ elif pagina == "📊 Analítica":
 
         estados = (
 
-            df.groupby(
-                "Estado"
-            )
+            df.groupby("Estado")
 
             .size()
 
-            .reset_index(
-                name="Total"
-            )
+            .reset_index(name="Total")
         )
 
         fig4 = px.bar(
