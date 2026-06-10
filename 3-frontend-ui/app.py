@@ -282,9 +282,9 @@ elif pagina == "📋 Menu del Dia":
 
 
 # PAGINA: ANALITICA
-elif pagina == "📊 Analitica":
+elif pagina == "📊 Analítica":
 
-    st.subheader("📊 Dashboard Analitico")
+    st.subheader("📊 Dashboard Analítico")
 
     if not ordenes:
         st.warning("No existen datos.")
@@ -297,7 +297,7 @@ elif pagina == "📊 Analitica":
         ticket_promedio = total_ventas / total_ordenes if total_ordenes else 0
 
         k1, k2, k3, k4 = st.columns(4)
-        k1.metric("📦 Ordenes",  total_ordenes)
+        k1.metric("📦 Órdenes",  total_ordenes)
         k2.metric("💰 Ventas",   f"S/ {total_ventas:.2f}")
         k3.metric("🍽️ Platos",  platos_totales)
         k4.metric("🧾 Ticket",   f"S/ {ticket_promedio:.2f}")
@@ -308,7 +308,7 @@ elif pagina == "📊 Analitica":
         data_platos = [
             {
                 "Plato":     plato["nombre"],
-                "Categoria": plato["categoria"],
+                "Categoría": plato["categoria"],
                 "Cantidad":  plato["cantidad"],
                 "Precio":    plato["precio"],
                 "Mesero":    orden["mesero"],
@@ -336,12 +336,12 @@ elif pagina == "📊 Analitica":
         )
         st.plotly_chart(fig1, use_container_width=True)
 
-        # Categorias
-        st.markdown("### 📦 Categorias Mas Vendidas")
-        categorias = df.groupby("Categoria")["Cantidad"].sum().reset_index()
+        # Categorías
+        st.markdown("### 📦 Categorías Más Vendidas")
+        categorias = df.groupby("Categoría")["Cantidad"].sum().reset_index()
         fig2 = px.pie(
             categorias,
-            names="Categoria", values="Cantidad",
+            names="Categoría", values="Cantidad",
             height=450
         )
         st.plotly_chart(fig2, use_container_width=True)
