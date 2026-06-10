@@ -22,6 +22,12 @@ MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017/")
 client = MongoClient(MONGO_URL)
 db = client["restaurante_fusion"]
 ordenes_collection = db["ordenes"]
+menu_collection = db["menu_del_dia"]
+
+
+def serializar_documento(doc):
+    doc["_id"] = str(doc["_id"])
+    return doc
 
 # Modelo de datos para validar la entrada de pedidos
 class Plato(BaseModel):
@@ -59,11 +65,16 @@ def obtener_ordenes_activas():
     try:
         # Traemos las órdenes que no están en estado "Listo"
         cursor = ordenes_collection.find({"estado": {"$ne": "Listo"}})
-        ordenes = []
-        for doc in cursor:
-            doc["_id"] = str(doc["_id"])  # Convertir ObjectId de Mongo a String
-            ordenes.append(doc)
-        return ordenes
+        return [serializar_documento(doc) for doc in cursor]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 2.1 Endpoint para listar todas las ordenes (Usado por analitica y cocina)
+@app.get("/api/ordenes")
+def obtener_ordenes():
+    try:
+        cursor = ordenes_collection.find().sort("timestamp", 1)
+        return [serializar_documento(doc) for doc in cursor]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -87,10 +98,15 @@ def actualizar_estado(orden_id: str, nuevo_estado: str = Body(embed=True)):
 def obtener_ordenes_listas():
     try:
         cursor = ordenes_collection.find({"estado": "Listo"})
-        ordenes = []
-        for doc in cursor:
-            doc["_id"] = str(doc["_id"])
-            ordenes.append(doc)
-        return ordenes
+        return [serializar_documento(doc) for doc in cursor]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 5. Endpoint para listar el menu del dia
+@app.get("/api/menu")
+def obtener_menu():
+    try:
+        cursor = menu_collection.find()
+        return [serializar_documento(doc) for doc in cursor]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

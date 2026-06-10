@@ -1,15 +1,15 @@
 import streamlit as st
-from pymongo import MongoClient
 from datetime import datetime
 import pandas as pd
 import plotly.express as px
 import os
+import requests
 
-# CONFIGURACIÓN INICIAL
+# CONFIGURACION INICIAL
 
 st.set_page_config(
-    page_title="Restaurant Fusion Pro 🍛",
-    page_icon="🍛",
+    page_title="Restaurant Fusion Pro",
+    page_icon="R",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -23,31 +23,43 @@ h1, h2, h3 { color: white; }
 """, unsafe_allow_html=True)
 
 
-# CONEXIÓN MONGODB
+# CONEXION API
 
-MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017/")
-client = MongoClient(MONGO_URL)
-db = client["restaurante_fusion"]
-ordenes_collection = db["ordenes"]
-menu_collection = db["menu_del_dia"]
+API_URL = os.getenv("API_URL", "http://localhost:8000").rstrip("/")
+
+
+def api_request(method, endpoint, **kwargs):
+    try:
+        response = requests.request(
+            method,
+            f"{API_URL}{endpoint}",
+            timeout=10,
+            **kwargs
+        )
+        response.raise_for_status()
+        return response.json() if response.content else None
+    except requests.RequestException as exc:
+        st.error(f"No se pudo conectar con el API: {exc}")
+        return [] if method.upper() == "GET" else None
 
 
 # funciones 
 
 @st.cache_data(ttl=5)
 def obtener_ordenes():
-    return list(ordenes_collection.find().sort("timestamp", 1))
+    return api_request("GET", "/api/ordenes")
 
 
 @st.cache_data(ttl=30)
 def obtener_menu():
-    return list(menu_collection.find())
+    return api_request("GET", "/api/menu")
 
 
 def actualizar_estado(orden_id, nuevo_estado):
-    ordenes_collection.update_one(
-        {"_id": orden_id},
-        {"$set": {"estado": nuevo_estado}}
+    return api_request(
+        "PUT",
+        f"/api/ordenes/{orden_id}/estado",
+        json={"nuevo_estado": nuevo_estado}
     )
 
 
@@ -63,12 +75,12 @@ def formatear_fecha(fecha_iso):
         return str(fecha_iso)
 
 
-# CONFIGURACIÓN KANBAN
+# CONFIGURACION KANBAN
 
 ESTADOS_CONFIG = {
-    "En cola":    {"color": "#ef4444", "emoji": "🔴", "next": "Preparando"},
-    "Preparando": {"color": "#f59e0b", "emoji": "🟡", "next": "Listo"},
-    "Listo":      {"color": "#10b981", "emoji": "🟢", "next": None},
+    "En cola":    {"color": "#ef4444", "emoji": "[ ]", "next": "Preparando"},
+    "Preparando": {"color": "#f59e0b", "emoji": "[~]", "next": "Listo"},
+    "Listo":      {"color": "#10b981", "emoji": "[OK]", "next": None},
 }
 
 ESTADOS_KANBAN = ["En cola", "Preparando", "Listo"]
@@ -84,7 +96,7 @@ def render_kanban_card(orden, estado_actual, col):
     with col:
         with st.container(border=True):
 
-            # Encabezado: solo datos estáticos en HTML
+            # Encabezado: solo datos estaticos en HTML
             st.markdown(
                 f"""
                 <div style="
@@ -95,21 +107,21 @@ def render_kanban_card(orden, estado_actual, col):
                     margin-bottom: 10px;
                 ">
                     <div style="font-size: 20px; font-weight: bold; color: white;">
-                        🍽️ Mesa {orden['mesa']}
+                        Mesa {orden['mesa']}
                     </div>
                     <div style="color: #9ca3af; font-size: 13px; margin-top: 4px;">
-                        👨 {orden['mesero']}
+                        Mesero: {orden['mesero']}
                         &nbsp;•&nbsp;
-                        🕒 {formatear_fecha(orden['timestamp'])}
+                        Hora: {formatear_fecha(orden['timestamp'])}
                         &nbsp;•&nbsp;
-                        🌙 {orden['turno'].capitalize()}
+                        Turno: {orden['turno'].capitalize()}
                     </div>
                 </div>
                 """,
                 unsafe_allow_html=True
             )
 
-            # Platos: solo datos estáticos en HTML
+            # Platos: solo datos estaticos en HTML
             for plato in orden["platos"]:
                 st.markdown(
                     f"""
@@ -129,14 +141,14 @@ def render_kanban_card(orden, estado_actual, col):
                     unsafe_allow_html=True
                 )
                 if plato.get("nota"):
-                    st.caption(f"📝 {plato['nota']}")
+                    st.caption(f"Nota: {plato['nota']}")
 
-            # Total y botón: componentes nativos de Streamlit
-            st.success(f"💰 Total: S/ {total:.2f}")
+            # Total y boton: componentes nativos de Streamlit
+            st.success(f"Total: S/ {total:.2f}")
 
             if config["next"]:
                 if st.button(
-                    f"➡️ Pasar a {config['next']}",
+                    f"Pasar a {config['next']}",
                     key=f"btn_{orden['_id']}_{config['next']}",
                     use_container_width=True
                 ):
@@ -166,31 +178,29 @@ def render_header_columna(estado):
     )
 
 
-# SIDEBAR Y NAVEGACIÓN
- 
-st.title("🍛 Restaurant Fusion Pro")
-st.caption("Sistema Inteligente de Cocina y Analítica en Tiempo Real")
+# SIDEBAR Y NAVEGACION
+st.title("Restaurant Fusion Pro")
+st.caption("Sistema Inteligente de Cocina y Analitica en Tiempo Real")
 
-st.sidebar.title("⚙️ Panel de Control")
+st.sidebar.title("Panel de Control")
 st.sidebar.divider()
 
 pagina = st.sidebar.radio(
-    "📂 Navegación",
-    ["👨‍🍳 Cocina Interactiva", "📋 Menú del Día", "📊 Analítica"]
+    "Navegacion",
+    ["Cocina Interactiva", "Menu del Dia", "Analitica"]
 )
 
 ordenes = obtener_ordenes()
 menu_dia = obtener_menu()
 
 
-# PÁGINA: COCINA INTERACTIVA
- 
-if pagina == "👨‍🍳 Cocina Interactiva":
+# PAGINA: COCINA INTERACTIVA
+if pagina == "Cocina Interactiva":
 
-    st.subheader("👨‍🍳 Cocina en Tiempo Real")
+    st.subheader("Cocina en Tiempo Real")
 
     busqueda = st.text_input(
-        "🔎 Buscar pedido",
+        "Buscar pedido",
         placeholder="Mesa, mesero o plato..."
     )
 
@@ -217,9 +227,9 @@ if pagina == "👨‍🍳 Cocina Interactiva":
             conteo[o["estado"]] += 1
 
     k1, k2, k3 = st.columns(3)
-    k1.metric("🔴 En Cola",    conteo["En cola"])
-    k2.metric("🟡 Preparando", conteo["Preparando"])
-    k3.metric("🟢 Listo",      conteo["Listo"])
+    k1.metric("En Cola",    conteo["En cola"])
+    k2.metric("Preparando", conteo["Preparando"])
+    k3.metric("Listo",      conteo["Listo"])
 
     st.divider()
 
@@ -243,40 +253,38 @@ if pagina == "👨‍🍳 Cocina Interactiva":
             render_kanban_card(orden, estado, columnas_map[estado])
 
     if not ordenes_activas:
-        st.info("No hay órdenes activas en este momento.")
+        st.info("No hay ordenes activas en este momento.")
 
 
-# PÁGINA: MENÚ DEL DÍA
- 
-elif pagina == "📋 Menú del Día":
+# PAGINA: MENU DEL DIA
+elif pagina == "Menu del Dia":
 
-    st.subheader("📋 Gestión del Menú")
+    st.subheader("Gestion del Menu")
 
     if not menu_dia:
-        st.warning("No hay menú registrado.")
+        st.warning("No hay menu registrado.")
     else:
         for menu in menu_dia:
-            st.markdown(f"## 🍽️ {menu['fecha']} — {menu['turno'].capitalize()}")
+            st.markdown(f"## {menu['fecha']} - {menu['turno'].capitalize()}")
             columnas = st.columns(3)
 
             for idx, plato in enumerate(menu["platos"]):
                 precio = plato.get("precio_especial", plato["precio_base"])
-                disponible_txt = "🟢 Disponible" if plato["disponible"] else "🔴 No disponible"
+                disponible_txt = "Disponible" if plato["disponible"] else "No disponible"
 
                 with columnas[idx % 3]:
                     with st.container(border=True):
                         st.markdown(f"### {plato['nombre']}")
                         st.caption(plato["categoria"].capitalize())
-                        st.write(f"💵 S/ {precio}")
-                        st.write(f"⏱️ {plato['tiempo_prep_min']} min")
+                        st.write(f"S/ {precio}")
+                        st.write(f"{plato['tiempo_prep_min']} min")
                         st.write(disponible_txt)
 
 
-# PÁGINA: ANALÍTICA
- 
-elif pagina == "📊 Analítica":
+# PAGINA: ANALITICA
+elif pagina == "Analitica":
 
-    st.subheader("📊 Dashboard Analítico")
+    st.subheader("Dashboard Analitico")
 
     if not ordenes:
         st.warning("No existen datos.")
@@ -289,10 +297,10 @@ elif pagina == "📊 Analítica":
         ticket_promedio = total_ventas / total_ordenes if total_ordenes else 0
 
         k1, k2, k3, k4 = st.columns(4)
-        k1.metric("📦 Órdenes",  total_ordenes)
-        k2.metric("💰 Ventas",   f"S/ {total_ventas:.2f}")
-        k3.metric("🍽️ Platos",  platos_totales)
-        k4.metric("🧾 Ticket",   f"S/ {ticket_promedio:.2f}")
+        k1.metric("Ordenes",  total_ordenes)
+        k2.metric("Ventas",   f"S/ {total_ventas:.2f}")
+        k3.metric("Platos",  platos_totales)
+        k4.metric("Ticket",   f"S/ {ticket_promedio:.2f}")
 
         st.divider()
 
@@ -300,7 +308,7 @@ elif pagina == "📊 Analítica":
         data_platos = [
             {
                 "Plato":     plato["nombre"],
-                "Categoría": plato["categoria"],
+                "Categoria": plato["categoria"],
                 "Cantidad":  plato["cantidad"],
                 "Precio":    plato["precio"],
                 "Mesero":    orden["mesero"],
@@ -314,7 +322,7 @@ elif pagina == "📊 Analítica":
         df = pd.DataFrame(data_platos)
 
         # Top platos
-        st.markdown("### 🔥 Top Platos")
+        st.markdown("### Top Platos")
         top_platos = (
             df.groupby("Plato")["Cantidad"]
             .sum()
@@ -328,18 +336,18 @@ elif pagina == "📊 Analítica":
         )
         st.plotly_chart(fig1, use_container_width=True)
 
-        # Categorías
-        st.markdown("### 📦 Categorías Más Vendidas")
-        categorias = df.groupby("Categoría")["Cantidad"].sum().reset_index()
+        # Categorias
+        st.markdown("### Categorias Mas Vendidas")
+        categorias = df.groupby("Categoria")["Cantidad"].sum().reset_index()
         fig2 = px.pie(
             categorias,
-            names="Categoría", values="Cantidad",
+            names="Categoria", values="Cantidad",
             height=450
         )
         st.plotly_chart(fig2, use_container_width=True)
 
         # Meseros
-        st.markdown("### 👨‍💼 Rendimiento de Meseros")
+        st.markdown("### Rendimiento de Meseros")
         meseros = (
             df.groupby("Mesero")["Cantidad"]
             .sum()
@@ -354,11 +362,11 @@ elif pagina == "📊 Analítica":
         st.plotly_chart(fig3, use_container_width=True)
 
         # Estados
-        st.markdown("### 🚦 Estados de Pedidos")
+        st.markdown("### Estados de Pedidos")
         estados = df.groupby("Estado").size().reset_index(name="Total")
         fig4 = px.bar(estados, x="Estado", y="Total", height=400)
         st.plotly_chart(fig4, use_container_width=True)
 
         # Tabla completa
-        st.markdown("### 📋 Datos Completos")
+        st.markdown("### Datos Completos")
         st.dataframe(df, use_container_width=True, hide_index=True)
