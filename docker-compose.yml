@@ -35,8 +35,10 @@ services:
     ports:
       - "8501:8501"
     environment:
+      - MONGO_URL=mongodb://admin:secret@mongodb:27017/
       - API_URL=http://backend-api:8000
     depends_on:
+      - mongodb
       - backend-api
 
 volumes:
