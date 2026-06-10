@@ -422,7 +422,7 @@ elif pagina == "📋 Menú del Día":
                 except Exception as e:
                     st.error(f"Error al guardar pedido: {e}")
 
-        # ========= MENÚ DISPONIBLE =========
+        # MENÚ DISPONIBLE
 
         st.divider()
 
