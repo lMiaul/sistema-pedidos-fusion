@@ -78,9 +78,9 @@ def formatear_fecha(fecha_iso):
 # CONFIGURACION KANBAN
 
 ESTADOS_CONFIG = {
-    "En cola":    {"color": "#ef4444", "emoji": "[ ]", "next": "Preparando"},
-    "Preparando": {"color": "#f59e0b", "emoji": "[~]", "next": "Listo"},
-    "Listo":      {"color": "#10b981", "emoji": "[OK]", "next": None},
+    "En cola":    {"color": "#ef4444", "emoji": "[🔴]", "next": "Preparando"},
+    "Preparando": {"color": "#f59e0b", "emoji": "[🟡]", "next": "Listo"},
+    "Listo":      {"color": "#10b981", "emoji": "[🟢]", "next": None},
 }
 
 ESTADOS_KANBAN = ["En cola", "Preparando", "Listo"]
@@ -107,14 +107,14 @@ def render_kanban_card(orden, estado_actual, col):
                     margin-bottom: 10px;
                 ">
                     <div style="font-size: 20px; font-weight: bold; color: white;">
-                        Mesa {orden['mesa']}
+                        🍽️ Mesa {orden['mesa']}
                     </div>
                     <div style="color: #9ca3af; font-size: 13px; margin-top: 4px;">
-                        Mesero: {orden['mesero']}
+                        👨 Mesero: {orden['mesero']}
                         &nbsp;•&nbsp;
-                        Hora: {formatear_fecha(orden['timestamp'])}
+                        🕒 Hora: {formatear_fecha(orden['timestamp'])}
                         &nbsp;•&nbsp;
-                        Turno: {orden['turno'].capitalize()}
+                        🌙 Turno: {orden['turno'].capitalize()}
                     </div>
                 </div>
                 """,
@@ -144,11 +144,11 @@ def render_kanban_card(orden, estado_actual, col):
                     st.caption(f"Nota: {plato['nota']}")
 
             # Total y boton: componentes nativos de Streamlit
-            st.success(f"Total: S/ {total:.2f}")
+            st.success(f"💰 Total: S/ {total:.2f}")
 
             if config["next"]:
                 if st.button(
-                    f"Pasar a {config['next']}",
+                    f"➡️ Pasar a {config['next']}",
                     key=f"btn_{orden['_id']}_{config['next']}",
                     use_container_width=True
                 ):
@@ -179,15 +179,15 @@ def render_header_columna(estado):
 
 
 # SIDEBAR Y NAVEGACION
-st.title("Restaurant Fusion Pro")
+st.title("🍛 Restaurant Fusion Pro")
 st.caption("Sistema Inteligente de Cocina y Analitica en Tiempo Real")
 
-st.sidebar.title("Panel de Control")
+st.sidebar.title("⚙️ Panel de Control")
 st.sidebar.divider()
 
 pagina = st.sidebar.radio(
-    "Navegacion",
-    ["Cocina Interactiva", "Menu del Dia", "Analitica"]
+    "📂 Navegacion",
+    ["👨‍🍳 Cocina Interactiva", "📋 Menú del Día", "📊 Analítica"]
 )
 
 ordenes = obtener_ordenes()
@@ -195,9 +195,9 @@ menu_dia = obtener_menu()
 
 
 # PAGINA: COCINA INTERACTIVA
-if pagina == "Cocina Interactiva":
+if pagina == "👨‍🍳 Cocina Interactiva":
 
-    st.subheader("Cocina en Tiempo Real")
+    st.subheader("👨‍🍳 Cocina en Tiempo Real")
 
     busqueda = st.text_input(
         "Buscar pedido",
@@ -227,9 +227,9 @@ if pagina == "Cocina Interactiva":
             conteo[o["estado"]] += 1
 
     k1, k2, k3 = st.columns(3)
-    k1.metric("En Cola",    conteo["En cola"])
-    k2.metric("Preparando", conteo["Preparando"])
-    k3.metric("Listo",      conteo["Listo"])
+    k1.metric("🔴 En Cola",    conteo["En cola"])
+    k2.metric("🟡 Preparando", conteo["Preparando"])
+    k3.metric("🟢 Listo",      conteo["Listo"])
 
     st.divider()
 
@@ -257,34 +257,34 @@ if pagina == "Cocina Interactiva":
 
 
 # PAGINA: MENU DEL DIA
-elif pagina == "Menu del Dia":
+elif pagina == "📋 Menu del Dia":
 
-    st.subheader("Gestion del Menu")
+    st.subheader("📋 Gestion del Menu")
 
     if not menu_dia:
         st.warning("No hay menu registrado.")
     else:
         for menu in menu_dia:
-            st.markdown(f"## {menu['fecha']} - {menu['turno'].capitalize()}")
+            st.markdown(f"## 🍽️ {menu['fecha']} - {menu['turno'].capitalize()}")
             columnas = st.columns(3)
 
             for idx, plato in enumerate(menu["platos"]):
                 precio = plato.get("precio_especial", plato["precio_base"])
-                disponible_txt = "Disponible" if plato["disponible"] else "No disponible"
+                disponible_txt = "🟢 Disponible" if plato["disponible"] else "🔴 No disponible"
 
                 with columnas[idx % 3]:
                     with st.container(border=True):
                         st.markdown(f"### {plato['nombre']}")
                         st.caption(plato["categoria"].capitalize())
-                        st.write(f"S/ {precio}")
-                        st.write(f"{plato['tiempo_prep_min']} min")
+                        st.write(f"💵 S/ {precio}")
+                        st.write(f"⏱️ {plato['tiempo_prep_min']} min")
                         st.write(disponible_txt)
 
 
 # PAGINA: ANALITICA
-elif pagina == "Analitica":
+elif pagina == "📊 Analitica":
 
-    st.subheader("Dashboard Analitico")
+    st.subheader("📊 Dashboard Analitico")
 
     if not ordenes:
         st.warning("No existen datos.")
@@ -297,10 +297,10 @@ elif pagina == "Analitica":
         ticket_promedio = total_ventas / total_ordenes if total_ordenes else 0
 
         k1, k2, k3, k4 = st.columns(4)
-        k1.metric("Ordenes",  total_ordenes)
-        k2.metric("Ventas",   f"S/ {total_ventas:.2f}")
-        k3.metric("Platos",  platos_totales)
-        k4.metric("Ticket",   f"S/ {ticket_promedio:.2f}")
+        k1.metric("📦 Ordenes",  total_ordenes)
+        k2.metric("💰 Ventas",   f"S/ {total_ventas:.2f}")
+        k3.metric("🍽️ Platos",  platos_totales)
+        k4.metric("🧾 Ticket",   f"S/ {ticket_promedio:.2f}")
 
         st.divider()
 
@@ -322,7 +322,7 @@ elif pagina == "Analitica":
         df = pd.DataFrame(data_platos)
 
         # Top platos
-        st.markdown("### Top Platos")
+        st.markdown("### 🔥 Top Platos")
         top_platos = (
             df.groupby("Plato")["Cantidad"]
             .sum()
@@ -337,7 +337,7 @@ elif pagina == "Analitica":
         st.plotly_chart(fig1, use_container_width=True)
 
         # Categorias
-        st.markdown("### Categorias Mas Vendidas")
+        st.markdown("### 📦 Categorias Mas Vendidas")
         categorias = df.groupby("Categoria")["Cantidad"].sum().reset_index()
         fig2 = px.pie(
             categorias,
@@ -347,7 +347,7 @@ elif pagina == "Analitica":
         st.plotly_chart(fig2, use_container_width=True)
 
         # Meseros
-        st.markdown("### Rendimiento de Meseros")
+        st.markdown("### 👨‍💼 Rendimiento de Meseros")
         meseros = (
             df.groupby("Mesero")["Cantidad"]
             .sum()
@@ -362,11 +362,11 @@ elif pagina == "Analitica":
         st.plotly_chart(fig3, use_container_width=True)
 
         # Estados
-        st.markdown("### Estados de Pedidos")
+        st.markdown("### 🚦 Estados de Pedidos")
         estados = df.groupby("Estado").size().reset_index(name="Total")
         fig4 = px.bar(estados, x="Estado", y="Total", height=400)
         st.plotly_chart(fig4, use_container_width=True)
 
         # Tabla completa
-        st.markdown("### Datos Completos")
+        st.markdown("### 📋 Datos Completos")
         st.dataframe(df, use_container_width=True, hide_index=True)
