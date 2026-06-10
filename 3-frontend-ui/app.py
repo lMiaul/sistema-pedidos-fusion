@@ -1,11 +1,14 @@
 import streamlit as st
-from pymongo import MongoClient
+import requests
 from datetime import datetime
 import pandas as pd
 import plotly.express as px
 import os
+import time
 
+# =========================================================
 # CONFIGURACIÓN INICIAL
+# =========================================================
 
 st.set_page_config(
     page_title="Restaurant Fusion Pro 🍛",
@@ -16,75 +19,166 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-.main { background-color: #0f1117; }
-.block-container { padding-top: 1rem; padding-bottom: 1rem; }
-h1, h2, h3 { color: white; }
+.main {
+    background-color: #0f1117;
+}
+
+.block-container {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+}
+
+h1, h2, h3 {
+    color: white;
+}
 </style>
 """, unsafe_allow_html=True)
 
+# =========================================================
+# API CONFIG
+# =========================================================
 
-# CONEXIÓN MONGODB
+API_URL = os.getenv("API_URL", "http://localhost:8000")
 
-MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017/")
-client = MongoClient(MONGO_URL)
-db = client["restaurante_fusion"]
-ordenes_collection = db["ordenes"]
-menu_collection = db["menu_del_dia"]
-
-
-# funciones 
+# =========================================================
+# FUNCIONES API
+# =========================================================
 
 @st.cache_data(ttl=5)
 def obtener_ordenes():
-    return list(ordenes_collection.find().sort("timestamp", 1))
+
+    try:
+
+        response = requests.get(
+            f"{API_URL}/api/ordenes/activas"
+        )
+
+        if response.status_code == 200:
+            return response.json()
+
+        return []
+
+    except Exception as e:
+        st.error(f"Error conectando API: {e}")
+        return []
 
 
 @st.cache_data(ttl=30)
 def obtener_menu():
-    return list(menu_collection.find())
+
+    # OPCIÓN RÁPIDA (SIN API)
+
+    return [{
+        "fecha": "2026-06-09",
+        "turno": "almuerzo",
+        "platos": [
+            {
+                "nombre": "Lomo Saltado",
+                "categoria": "fondo",
+                "precio_base": 25,
+                "tiempo_prep_min": 20,
+                "disponible": True
+            },
+            {
+                "nombre": "Ceviche",
+                "categoria": "entrada",
+                "precio_base": 30,
+                "tiempo_prep_min": 15,
+                "disponible": True
+            },
+            {
+                "nombre": "Ají de Gallina",
+                "categoria": "fondo",
+                "precio_base": 22,
+                "tiempo_prep_min": 18,
+                "disponible": True
+            }
+        ]
+    }]
 
 
 def actualizar_estado(orden_id, nuevo_estado):
-    ordenes_collection.update_one(
-        {"_id": orden_id},
-        {"$set": {"estado": nuevo_estado}}
-    )
+
+    try:
+
+        response = requests.put(
+            f"{API_URL}/api/ordenes/{orden_id}/estado",
+            json={"nuevo_estado": nuevo_estado}
+        )
+
+        return response.status_code == 200
+
+    except Exception as e:
+        st.error(f"Error actualizando estado: {e}")
+        return False
 
 
 def calcular_total_orden(platos):
-    return sum(p["precio"] * p["cantidad"] for p in platos)
+    return sum(
+        p["precio"] * p["cantidad"]
+        for p in platos
+    )
 
 
 def formatear_fecha(fecha_iso):
+
     try:
-        fecha = datetime.fromisoformat(fecha_iso.replace("Z", ""))
+
+        fecha = datetime.fromisoformat(
+            fecha_iso.replace("Z", "")
+        )
+
         return fecha.strftime("%H:%M")
+
     except Exception:
         return str(fecha_iso)
 
-
+# =========================================================
 # CONFIGURACIÓN KANBAN
+# =========================================================
 
 ESTADOS_CONFIG = {
-    "En cola":    {"color": "#ef4444", "emoji": "🔴", "next": "Preparando"},
-    "Preparando": {"color": "#f59e0b", "emoji": "🟡", "next": "Listo"},
-    "Listo":      {"color": "#10b981", "emoji": "🟢", "next": None},
+    "En cola": {
+        "color": "#ef4444",
+        "emoji": "🔴",
+        "next": "Preparando"
+    },
+
+    "Preparando": {
+        "color": "#f59e0b",
+        "emoji": "🟡",
+        "next": "Listo"
+    },
+
+    "Listo": {
+        "color": "#10b981",
+        "emoji": "🟢",
+        "next": None
+    },
 }
 
-ESTADOS_KANBAN = ["En cola", "Preparando", "Listo"]
+ESTADOS_KANBAN = [
+    "En cola",
+    "Preparando",
+    "Listo"
+]
 
-
+# =========================================================
 # COMPONENTES UI
+# =========================================================
 
 def render_kanban_card(orden, estado_actual, col):
-    """Renderiza una tarjeta kanban para una orden."""
+
     config = ESTADOS_CONFIG[estado_actual]
-    total = calcular_total_orden(orden["platos"])
+
+    total = calcular_total_orden(
+        orden["platos"]
+    )
 
     with col:
+
         with st.container(border=True):
 
-            # Encabezado: solo datos estáticos en HTML
             st.markdown(
                 f"""
                 <div style="
@@ -94,10 +188,19 @@ def render_kanban_card(orden, estado_actual, col):
                     background-color: #111827;
                     margin-bottom: 10px;
                 ">
-                    <div style="font-size: 20px; font-weight: bold; color: white;">
+                    <div style="
+                        font-size: 20px;
+                        font-weight: bold;
+                        color: white;
+                    ">
                         🍽️ Mesa {orden['mesa']}
                     </div>
-                    <div style="color: #9ca3af; font-size: 13px; margin-top: 4px;">
+
+                    <div style="
+                        color: #9ca3af;
+                        font-size: 13px;
+                        margin-top: 4px;
+                    ">
                         👨 {orden['mesero']}
                         &nbsp;•&nbsp;
                         🕒 {formatear_fecha(orden['timestamp'])}
@@ -109,8 +212,8 @@ def render_kanban_card(orden, estado_actual, col):
                 unsafe_allow_html=True
             )
 
-            # Platos: solo datos estáticos en HTML
             for plato in orden["platos"]:
+
                 st.markdown(
                     f"""
                     <div style="
@@ -121,33 +224,44 @@ def render_kanban_card(orden, estado_actual, col):
                         color: white;
                     ">
                         <b>{plato['cantidad']}x {plato['nombre']}</b><br>
+
                         <small style="color: #9ca3af;">
-                            {plato['categoria'].capitalize()} &nbsp;•&nbsp; S/ {plato['precio']}
+                            {plato['categoria'].capitalize()}
+                            &nbsp;•&nbsp;
+                            S/ {plato['precio']}
                         </small>
                     </div>
                     """,
                     unsafe_allow_html=True
                 )
+
                 if plato.get("nota"):
                     st.caption(f"📝 {plato['nota']}")
 
-            # Total y botón: componentes nativos de Streamlit
             st.success(f"💰 Total: S/ {total:.2f}")
 
             if config["next"]:
+
                 if st.button(
                     f"➡️ Pasar a {config['next']}",
                     key=f"btn_{orden['_id']}_{config['next']}",
                     use_container_width=True
                 ):
-                    actualizar_estado(orden["_id"], config["next"])
-                    st.cache_data.clear()
-                    st.rerun()
+
+                    ok = actualizar_estado(
+                        orden["_id"],
+                        config["next"]
+                    )
+
+                    if ok:
+                        st.cache_data.clear()
+                        st.rerun()
 
 
 def render_header_columna(estado):
-    """Renderiza el encabezado de cada columna kanban."""
+
     config = ESTADOS_CONFIG[estado]
+
     st.markdown(
         f"""
         <div style="
@@ -157,7 +271,11 @@ def render_header_columna(estado):
             border-radius: 8px;
             margin-bottom: 12px;
         ">
-            <span style="font-size: 16px; font-weight: bold; color: white;">
+            <span style="
+                font-size: 16px;
+                font-weight: bold;
+                color: white;
+            ">
                 {config['emoji']} {estado}
             </span>
         </div>
@@ -165,24 +283,37 @@ def render_header_columna(estado):
         unsafe_allow_html=True
     )
 
+# =========================================================
+# SIDEBAR
+# =========================================================
 
-# SIDEBAR Y NAVEGACIÓN
 st.title("🍛 Restaurant Fusion Pro")
-st.caption("Sistema Inteligente de Cocina y Analítica en Tiempo Real")
+
+st.caption(
+    "Sistema Inteligente de Cocina y Analítica en Tiempo Real"
+)
 
 st.sidebar.title("⚙️ Panel de Control")
+
 st.sidebar.divider()
 
 pagina = st.sidebar.radio(
     "📂 Navegación",
-    ["👨‍🍳 Cocina Interactiva", "📋 Menú del Día", "📊 Analítica"]
+    [
+        "👨‍🍳 Cocina Interactiva",
+        "📋 Menú del Día",
+        "📊 Analítica"
+    ]
 )
 
 ordenes = obtener_ordenes()
+
 menu_dia = obtener_menu()
 
+# =========================================================
+# COCINA INTERACTIVA
+# =========================================================
 
-# PÁGINA: COCINA INTERACTIVA
 if pagina == "👨‍🍳 Cocina Interactiva":
 
     st.subheader("👨‍🍳 Cocina en Tiempo Real")
@@ -193,8 +324,14 @@ if pagina == "👨‍🍳 Cocina Interactiva":
     )
 
     def coincide_busqueda(orden):
+
         texto = busqueda.lower()
-        platos_texto = " ".join(p["nombre"].lower() for p in orden["platos"])
+
+        platos_texto = " ".join(
+            p["nombre"].lower()
+            for p in orden["platos"]
+        )
+
         return (
             texto in str(orden["mesa"]).lower()
             or texto in orden["mesero"].lower()
@@ -202,352 +339,445 @@ if pagina == "👨‍🍳 Cocina Interactiva":
         )
 
     ordenes_activas = [
+
         o for o in ordenes
+
         if o["estado"] in ESTADOS_KANBAN
-        and o["turno"] in ("almuerzo", "cena")
-        and (coincide_busqueda(o) if busqueda else True)
+        and (
+            coincide_busqueda(o)
+            if busqueda else True
+        )
     ]
 
-    # KPIs
-    conteo = {e: 0 for e in ESTADOS_KANBAN}
+    conteo = {
+        e: 0
+        for e in ESTADOS_KANBAN
+    }
+
     for o in ordenes:
+
         if o["estado"] in conteo:
             conteo[o["estado"]] += 1
 
     k1, k2, k3 = st.columns(3)
-    k1.metric("🔴 En Cola",    conteo["En cola"])
-    k2.metric("🟡 Preparando", conteo["Preparando"])
-    k3.metric("🟢 Listo",      conteo["Listo"])
+
+    k1.metric(
+        "🔴 En Cola",
+        conteo["En cola"]
+    )
+
+    k2.metric(
+        "🟡 Preparando",
+        conteo["Preparando"]
+    )
+
+    k3.metric(
+        "🟢 Listo",
+        conteo["Listo"]
+    )
 
     st.divider()
 
-    # Tablero kanban
     col1, col2, col3 = st.columns(3)
+
     columnas_map = {
-        "En cola":    col1,
+        "En cola": col1,
         "Preparando": col2,
-        "Listo":      col3,
+        "Listo": col3,
     }
 
-    # Encabezados de columna
     for estado, col in columnas_map.items():
+
         with col:
             render_header_columna(estado)
 
-    # Tarjetas por estado
     for orden in ordenes_activas:
+
         estado = orden["estado"]
+
         if estado in columnas_map:
-            render_kanban_card(orden, estado, columnas_map[estado])
+
+            render_kanban_card(
+                orden,
+                estado,
+                columnas_map[estado]
+            )
 
     if not ordenes_activas:
-        st.info("No hay órdenes activas en este momento.")
+        st.info("No hay órdenes activas.")
 
+# =========================================================
+# MENÚ DEL DÍA
+# =========================================================
 
-# PÁGINA: MENÚ DEL DÍA
 elif pagina == "📋 Menú del Día":
-
-    import time
 
     st.subheader("📋 Nuevo Pedido")
 
-    if not menu_dia:
-        st.warning("No hay menú registrado.")
+    menu_actual = menu_dia[0]
 
-    else:
-        menu_actual = menu_dia[0]
+    st.markdown(
+        f"### 🍽️ {menu_actual['fecha']} — "
+        f"{menu_actual['turno'].capitalize()}"
+    )
+
+    platos_disponibles = [
+
+        p for p in menu_actual["platos"]
+
+        if p["disponible"]
+    ]
+
+    with st.form(
+        "nuevo_pedido",
+        clear_on_submit=True
+    ):
 
         st.markdown(
-            f"### 🍽️ {menu_actual['fecha']} — {menu_actual['turno'].capitalize()}"
+            "## 🧾 Información del Pedido"
         )
 
-        platos_disponibles = [
-            p for p in menu_actual["platos"]
-            if p["disponible"]
-        ]
+        col1, col2, col3 = st.columns(3)
 
-        with st.form("nuevo_pedido", clear_on_submit=True):
+        with col1:
 
-            st.markdown("## 🧾 Información del Pedido")
+            mesa = st.selectbox(
+                "🍽️ Mesa",
+                options=["Seleccionar"] + list(range(1, 11))
+            )
 
-            col1, col2, col3 = st.columns(3)
+        with col2:
 
-            with col1:
-                mesa = st.selectbox(
-                    "🍽️ Mesa",
-                    options=["Seleccionar"] + list(range(1, 11)),
-                    key="mesa_select"
-                )
+            turno = st.selectbox(
+                "🌙 Turno",
+                options=[
+                    "Seleccionar",
+                    "almuerzo",
+                    "cena"
+                ]
+            )
 
-            with col2:
-                turno = st.selectbox(
-                    "🌙 Turno",
-                    options=["Seleccionar", "almuerzo", "cena"],
-                    key="turno_select"
-                )
+        with col3:
 
-            with col3:
-                meseros_disponibles = [
+            mesero = st.selectbox(
+                "👨 Nombre del mesero",
+                [
                     "Seleccionar",
                     "Ana Torres",
                     "Carlos Diaz",
                     "Juan Perez",
                     "Maria Lopez"
                 ]
-
-                mesero = st.selectbox(
-                    "👨 Nombre del mesero",
-                    meseros_disponibles,
-                    key="mesero_select"
-                )
-
-            estado = "En cola"
-
-            st.divider()
-
-            st.markdown("## 🍛 Seleccionar Platos")
-
-            platos_pedido = []
-
-            for plato in platos_disponibles:
-
-                id_plato = str(plato.get("_id", plato["nombre"]))
-
-                precio_mostrar = (
-                    plato.get("precio_especial")
-                    if plato.get("precio_especial") is not None
-                    else plato.get("precio_base", 0)
-                )
-
-                with st.container(border=True):
-
-                    c1, c2 = st.columns([4, 1])
-
-                    with c1:
-                        agregar = st.checkbox(
-                            f"{plato['nombre']} • S/ {precio_mostrar}",
-                            key=f"check_{id_plato}"
-                        )
-
-                    with c2:
-                        cantidad = st.number_input(
-                            "Cant",
-                            min_value=1,
-                            max_value=20,
-                            value=1,
-                            step=1,
-                            key=f"cant_{id_plato}"
-                        )
-
-                    nota = st.text_input(
-                        "📝 Nota",
-                        key=f"nota_{id_plato}"
-                    )
-
-                    if agregar:
-
-                        platos_pedido.append({
-                            "nombre": plato["nombre"],
-                            "categoria": plato["categoria"],
-                            "precio": float(precio_mostrar),
-                            "cantidad": int(cantidad),
-                            "nota": nota.strip() if nota.strip() else None
-                        })
-
-            st.divider()
-
-            enviado = st.form_submit_button(
-                "🚀 Enviar Pedido a Cocina",
-                use_container_width=True
             )
 
-        # ========= ENVÍO =========
-
-        if enviado:
-
-            # VALIDACIONES
-
-            if mesa == "Seleccionar":
-                st.error("Selecciona una mesa.")
-
-            elif turno == "Seleccionar":
-                st.error("Selecciona un turno.")
-
-            elif mesero == "Seleccionar":
-                st.error("Selecciona un mesero.")
-
-            elif len(platos_pedido) == 0:
-                st.error("Debes seleccionar al menos un plato.")
-
-            else:
-
-                try:
-
-                    # ========= GUARDAR EN MONGO =========
-
-                    nueva_orden = {
-                        "mesa": int(mesa),
-                        "turno": turno,
-                        "mesero": mesero,
-                        "estado": estado,
-                        "timestamp": datetime.utcnow().isoformat(),
-                        "platos": platos_pedido
-                    }
-
-                    resultado = ordenes_collection.insert_one(nueva_orden)
-
-                    # Verificación real
-                    if resultado.inserted_id:
-
-                        # Limpiar caché
-                        st.cache_data.clear()
-
-                        # LIMPIAR FORMULARIO
-
-                        mensaje = st.success(
-                            "✅ Pedido enviado correctamente a cocina."
-                        )
-
-                        # Esperar 5 segundos
-                        time.sleep(5)
-
-                        mensaje.empty()
-
-                        # Recargar app
-                        st.rerun()
-
-                    else:
-                        st.error("No se pudo guardar el pedido.")
-
-                except Exception as e:
-                    st.error(f"Error al guardar pedido: {e}")
-
-        # MENÚ DISPONIBLE
+        estado = "En cola"
 
         st.divider()
 
-        st.markdown("### 🍽️ Menú Disponible")
+        st.markdown(
+            "## 🍛 Seleccionar Platos"
+        )
 
-        columnas = st.columns(3)
+        platos_pedido = []
 
-        for idx, plato in enumerate(platos_disponibles):
+        for plato in platos_disponibles:
 
-            with columnas[idx % 3]:
+            id_plato = plato["nombre"]
 
-                precio_especial = plato.get("precio_especial")
-                precio_base = plato.get("precio_base", 0)
+            precio_mostrar = plato["precio_base"]
 
-                precio_final = (
-                    precio_especial
-                    if (
-                        precio_especial is not None
-                        and precio_especial > 0
+            with st.container(border=True):
+
+                c1, c2 = st.columns([4, 1])
+
+                with c1:
+
+                    agregar = st.checkbox(
+                        f"{plato['nombre']} • "
+                        f"S/ {precio_mostrar}",
+                        key=f"check_{id_plato}"
                     )
-                    else precio_base
+
+                with c2:
+
+                    cantidad = st.number_input(
+                        "Cant",
+                        min_value=1,
+                        max_value=20,
+                        value=1,
+                        step=1,
+                        key=f"cant_{id_plato}"
+                    )
+
+                nota = st.text_input(
+                    "📝 Nota",
+                    key=f"nota_{id_plato}"
                 )
 
-                with st.container(border=True):
+                if agregar:
 
-                    st.markdown(f"### {plato['nombre']}")
+                    platos_pedido.append({
+                        "nombre": plato["nombre"],
+                        "categoria": plato["categoria"],
+                        "precio": float(precio_mostrar),
+                        "cantidad": int(cantidad),
+                        "nota": nota.strip()
+                        if nota.strip()
+                        else None
+                    })
 
-                    st.caption(
-                        plato["categoria"].capitalize()
+        st.divider()
+
+        enviado = st.form_submit_button(
+            "🚀 Enviar Pedido a Cocina",
+            use_container_width=True
+        )
+
+    # =====================================================
+    # ENVÍO
+    # =====================================================
+
+    if enviado:
+
+        if mesa == "Seleccionar":
+
+            st.error("Selecciona una mesa.")
+
+        elif turno == "Seleccionar":
+
+            st.error("Selecciona un turno.")
+
+        elif mesero == "Seleccionar":
+
+            st.error("Selecciona un mesero.")
+
+        elif len(platos_pedido) == 0:
+
+            st.error(
+                "Debes seleccionar al menos un plato."
+            )
+
+        else:
+
+            try:
+
+                nueva_orden = {
+                    "mesa": int(mesa),
+                    "turno": turno,
+                    "mesero": mesero,
+                    "estado": estado,
+                    "platos": platos_pedido
+                }
+
+                response = requests.post(
+                    f"{API_URL}/api/ordenes",
+                    json=nueva_orden
+                )
+
+                if response.status_code == 201:
+
+                    st.cache_data.clear()
+
+                    mensaje = st.success(
+                        "✅ Pedido enviado correctamente."
                     )
 
-                    st.write(f"💵 S/ {precio_final}")
+                    time.sleep(3)
 
-                    st.write(
-                        f"⏱️ {plato['tiempo_prep_min']} min"
+                    mensaje.empty()
+
+                    st.rerun()
+
+                else:
+
+                    st.error(
+                        f"Error API: {response.text}"
                     )
 
-                    st.success("🟢 Disponible")
+            except Exception as e:
 
-# PÁGINA: ANALÍTICA
+                st.error(
+                    f"Error enviando pedido: {e}"
+                )
+
+# =========================================================
+# ANALÍTICA
+# =========================================================
+
 elif pagina == "📊 Analítica":
 
     st.subheader("📊 Dashboard Analítico")
 
     if not ordenes:
+
         st.warning("No existen datos.")
+
     else:
+
         total_ordenes = len(ordenes)
-        total_ventas  = sum(calcular_total_orden(o["platos"]) for o in ordenes)
-        platos_totales = sum(
-            sum(p["cantidad"] for p in o["platos"]) for o in ordenes
+
+        total_ventas = sum(
+            calcular_total_orden(o["platos"])
+            for o in ordenes
         )
-        ticket_promedio = total_ventas / total_ordenes if total_ordenes else 0
+
+        platos_totales = sum(
+            sum(
+                p["cantidad"]
+                for p in o["platos"]
+            )
+            for o in ordenes
+        )
+
+        ticket_promedio = (
+            total_ventas / total_ordenes
+            if total_ordenes
+            else 0
+        )
 
         k1, k2, k3, k4 = st.columns(4)
-        k1.metric("📦 Órdenes",  total_ordenes)
-        k2.metric("💰 Ventas",   f"S/ {total_ventas:.2f}")
-        k3.metric("🍽️ Platos",  platos_totales)
-        k4.metric("🧾 Ticket",   f"S/ {ticket_promedio:.2f}")
+
+        k1.metric(
+            "📦 Órdenes",
+            total_ordenes
+        )
+
+        k2.metric(
+            "💰 Ventas",
+            f"S/ {total_ventas:.2f}"
+        )
+
+        k3.metric(
+            "🍽️ Platos",
+            platos_totales
+        )
+
+        k4.metric(
+            "🧾 Ticket",
+            f"S/ {ticket_promedio:.2f}"
+        )
 
         st.divider()
 
-        # Construir DataFrame
         data_platos = [
+
             {
-                "Plato":     plato["nombre"],
+                "Plato": plato["nombre"],
                 "Categoría": plato["categoria"],
-                "Cantidad":  plato["cantidad"],
-                "Precio":    plato["precio"],
-                "Mesero":    orden["mesero"],
-                "Mesa":      orden["mesa"],
-                "Estado":    orden["estado"],
-                "Turno":     orden["turno"],
+                "Cantidad": plato["cantidad"],
+                "Precio": plato["precio"],
+                "Mesero": orden["mesero"],
+                "Mesa": orden["mesa"],
+                "Estado": orden["estado"],
+                "Turno": orden["turno"],
             }
+
             for orden in ordenes
             for plato in orden["platos"]
         ]
+
         df = pd.DataFrame(data_platos)
 
-        # Top platos
         st.markdown("### 🔥 Top Platos")
+
         top_platos = (
             df.groupby("Plato")["Cantidad"]
             .sum()
             .reset_index()
-            .sort_values("Cantidad", ascending=True)
+            .sort_values(
+                "Cantidad",
+                ascending=True
+            )
         )
+
         fig1 = px.bar(
             top_platos,
-            x="Cantidad", y="Plato",
-            orientation="h", height=500
+            x="Cantidad",
+            y="Plato",
+            orientation="h",
+            height=500
         )
-        st.plotly_chart(fig1, use_container_width=True)
 
-        # Categorías
-        st.markdown("### 📦 Categorías Más Vendidas")
-        categorias = df.groupby("Categoría")["Cantidad"].sum().reset_index()
+        st.plotly_chart(
+            fig1,
+            use_container_width=True
+        )
+
+        st.markdown(
+            "### 📦 Categorías Más Vendidas"
+        )
+
+        categorias = (
+            df.groupby("Categoría")["Cantidad"]
+            .sum()
+            .reset_index()
+        )
+
         fig2 = px.pie(
             categorias,
-            names="Categoría", values="Cantidad",
+            names="Categoría",
+            values="Cantidad",
             height=450
         )
-        st.plotly_chart(fig2, use_container_width=True)
 
-        # Meseros
-        st.markdown("### 👨‍💼 Rendimiento de Meseros")
+        st.plotly_chart(
+            fig2,
+            use_container_width=True
+        )
+
+        st.markdown(
+            "### 👨‍💼 Rendimiento de Meseros"
+        )
+
         meseros = (
             df.groupby("Mesero")["Cantidad"]
             .sum()
             .reset_index()
-            .sort_values("Cantidad", ascending=True)
+            .sort_values(
+                "Cantidad",
+                ascending=True
+            )
         )
+
         fig3 = px.bar(
             meseros,
-            x="Cantidad", y="Mesero",
-            orientation="h", height=450
+            x="Cantidad",
+            y="Mesero",
+            orientation="h",
+            height=450
         )
-        st.plotly_chart(fig3, use_container_width=True)
 
-        # Estados
-        st.markdown("### 🚦 Estados de Pedidos")
-        estados = df.groupby("Estado").size().reset_index(name="Total")
-        fig4 = px.bar(estados, x="Estado", y="Total", height=400)
-        st.plotly_chart(fig4, use_container_width=True)
+        st.plotly_chart(
+            fig3,
+            use_container_width=True
+        )
 
-        # Tabla completa
+        st.markdown(
+            "### 🚦 Estados de Pedidos"
+        )
+
+        estados = (
+            df.groupby("Estado")
+            .size()
+            .reset_index(name="Total")
+        )
+
+        fig4 = px.bar(
+            estados,
+            x="Estado",
+            y="Total",
+            height=400
+        )
+
+        st.plotly_chart(
+            fig4,
+            use_container_width=True
+        )
+
         st.markdown("### 📋 Datos Completos")
-        st.dataframe(df, use_container_width=True, hide_index=True)
+
+        st.dataframe(
+            df,
+            use_container_width=True,
+            hide_index=True
+        )

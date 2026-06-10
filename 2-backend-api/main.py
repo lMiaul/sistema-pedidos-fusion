@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pymongo import MongoClient
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 import os
 from datetime import datetime
 
@@ -23,11 +23,21 @@ client = MongoClient(MONGO_URL)
 db = client["restaurante_fusion"]
 ordenes_collection = db["ordenes"]
 
-# Modelo de datos para validar la entrada de pedidos
+# Definimos cómo se ve un plato dentro de la lista
+class Plato(BaseModel):
+    nombre: str
+    categoria: str
+    precio: float
+    cantidad: int
+    nota: Optional[str] = None
+
+# Actualizamos el modelo Orden
 class Orden(BaseModel):
     mesa: int
-    platos: List[str]
-    estado: str = "En cola"  # Estados: En cola, Preparando, Listo
+    turno: str
+    mesero: str
+    estado: str
+    platos: List[Plato] # Ahora recibe la lista de objetos complejos
 
 @app.get("/")
 def read_root():
