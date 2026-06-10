@@ -72,3 +72,16 @@ def actualizar_estado(orden_id: str, nuevo_estado: str = Body(embed=True)):
         return {"message": f"Estado actualizado a {nuevo_estado}"}
     except Exception as e:
         raise HTTPException(status_code=400, detail="ID no válido o error de servidor")
+
+# 4. Endpoint para listar órdenes listas
+@app.get("/api/ordenes/listas")
+def obtener_ordenes_listas():
+    try:
+        cursor = ordenes_collection.find({"estado": "Listo"})
+        ordenes = []
+        for doc in cursor:
+            doc["_id"] = str(doc["_id"])
+            ordenes.append(doc)
+        return ordenes
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
